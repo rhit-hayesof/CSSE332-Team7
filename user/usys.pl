@@ -36,3 +36,6 @@ entry("getpid");
 entry("sbrk");
 entry("sleep");
 entry("uptime");
+entry("spoon");
+entry("thread_create");
+entry("thread_join");

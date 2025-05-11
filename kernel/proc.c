@@ -451,7 +451,6 @@ scheduler(void)
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
-
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
       if(p->state == RUNNABLE) {
@@ -461,7 +460,7 @@ scheduler(void)
         p->state = RUNNING;
         c->proc = p;
         swtch(&c->context, &p->context);
-
+	p->state = SLEEPING;
         // Process is done running for now.
         // It should have changed its p->state before coming back.
         c->proc = 0;
@@ -680,4 +679,75 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+uint64 spoon(void *arg) {
+  printf("In spoon system call with argument %p\n", arg);
+  return 0;
+}
+
+uint64
+thread_create(void (*start_routine)(void *), void *arg) {
+  int i;
+  struct proc *p = myproc();
+  struct proc *np;
+
+  // Allocate a new process (thread)
+  if ((np = allocproc()) == 0) {
+    return -1;
+  }
+
+  // Copy user memory from parent to child (new address space)
+  if (uvmcopy(p->pagetable, np->pagetable, p->sz) < 0) {
+    freeproc(np);
+    return -1;
+  }
+
+  // Set size of memory (sz) for thread
+  np->sz = p->sz;
+
+  // Copy the trapframe from parent
+  *(np->trapframe) = *(p->trapframe);
+
+  // Set return value in thread to 0 (just like fork)
+  np->trapframe->a0 = 0;
+
+  // Set up the new thread's entry point
+  np->trapframe->epc = (uint64)start_routine;
+
+  // Allocate a new user stack for this thread
+  uint64 stack_bottom = PGROUNDUP(np->sz);
+  np->sz = uvmalloc(np->pagetable, np->sz, np->sz + PGSIZE, PTE_W);
+  if (np->sz == 0) {
+    freeproc(np);
+    return -1;
+  }
+
+  // Save stack pointer for cleanup later
+  np->stack_base = (void*)stack_bottom;
+
+  // Set stack pointer to top of new stack
+  np->trapframe->sp = stack_bottom + PGSIZE;
+
+  // Put the argument into a0 (RISC-V convention)
+  np->trapframe->a0 = (uint64)arg;
+
+  // Thread-specific metadata
+  np->is_thread = 1;
+  np->thread_parent = p;
+
+  //Inherit open files
+  for(i = 0; i < NOFILE; i++)
+	  if(p->ofile[i])
+		   np->ofile[i] = filedup(p->ofile[i]);
+  // Inherit current working directory
+  np->cwd = idup(p->cwd);
+
+  // Copy name
+  safestrcpy(np->name, p->name, sizeof(p->name));
+
+  // Make thread runnable
+  np->state = RUNNABLE;
+
+  return np->pid;
 }

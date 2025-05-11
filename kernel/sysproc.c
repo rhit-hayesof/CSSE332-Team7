@@ -89,3 +89,26 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+uint64 sys_spoon(void) {
+  uint64 addr;
+  argaddr(0, &addr);
+  return spoon((void*)addr);
+}
+
+uint64 sys_thread_create(void) {
+  uint64 fcn_addr, arg_addr;
+
+  // Fetch raw user arguments.
+  argaddr(0, &fcn_addr);
+  argaddr(1, &arg_addr);
+
+  // Call the kernel thread_create from proc.c.
+  return thread_create((void (*)(void *))fcn_addr, (void *)arg_addr);
+}
+
+uint64 sys_thread_join(void) {
+  printf("sys_thread_join: This call has not been implemented yet!\n");
+  return 0;
+}
+
