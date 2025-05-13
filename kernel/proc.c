@@ -685,68 +685,46 @@ uint64 spoon(void *arg) {
   return 0;
 }
 
-uint64
-thread_create(void (*start_routine)(void *), void *arg) {
+uint64 thread_create(void (*start_routine)(void *), void *arg) {
   int i;
-  struct proc *p = myproc();
+  struct proc *p;
   struct proc *np;
-
   // Allocate a new process (thread)
   if ((np = allocproc()) == 0) {
     return -1;
   }
-
+  push_off();
+  p = myproc();
+  pop_off(); 
   // Copy user memory from parent to child (new address space)
   if (uvmcopy(p->pagetable, np->pagetable, p->sz) < 0) {
     freeproc(np);
     return -1;
   }
-
-  // Set size of memory (sz) for thread
-  np->sz = p->sz;
-
-  // Copy the trapframe from parent
-  *(np->trapframe) = *(p->trapframe);
-
-  // Set return value in thread to 0 (just like fork)
-  np->trapframe->a0 = 0;
-
-  // Set up the new thread's entry point
-  np->trapframe->epc = (uint64)start_routine;
-
-  // Allocate a new user stack for this thread
-  uint64 stack_bottom = PGROUNDUP(np->sz);
-  np->sz = uvmalloc(np->pagetable, np->sz, np->sz + PGSIZE, PTE_W);
-  if (np->sz == 0) {
+  np->sz = p->sz;  // Set size of memory for thread
+  *(np->trapframe) = *(p->trapframe);  // Copy the trapframe from parent
+  np->trapframe->a0 = 0; // Set return value in thread to 0
+  np->trapframe->epc = (uint64)start_routine; // Set thread start point
+  // Allocate stack high in memory to avoid overlap
+  uint64 stack_bottom = MAXVA - (np->pid + 1) * 2 * PGSIZE;  // shift each thread's stack
+  uint64 stack_top = stack_bottom + PGSIZE;
+  if (uvmalloc(np->pagetable, stack_bottom, stack_top, PTE_W | PTE_U) == 0) {
     freeproc(np);
     return -1;
   }
-
-  // Save stack pointer for cleanup later
-  np->stack_base = (void*)stack_bottom;
-
-  // Set stack pointer to top of new stack
-  np->trapframe->sp = stack_bottom + PGSIZE;
-
-  // Put the argument into a0 (RISC-V convention)
-  np->trapframe->a0 = (uint64)arg;
-
-  // Thread-specific metadata
+  np->stack_base = (void*)stack_bottom;// Save for cleanup
+  np->trapframe->sp = stack_top; // Set stack pointer
+  np->trapframe->a0 = (uint64)arg; // Pass the argument
+  // Thread metadata
   np->is_thread = 1;
   np->thread_parent = p;
-
-  //Inherit open files
-  for(i = 0; i < NOFILE; i++)
-	  if(p->ofile[i])
-		   np->ofile[i] = filedup(p->ofile[i]);
-  // Inherit current working directory
-  np->cwd = idup(p->cwd);
-
-  // Copy name
+  // Inherit open files
+  for (i = 0; i < NOFILE; i++)
+    if (p->ofile[i])
+      np->ofile[i] = filedup(p->ofile[i]);
+  np->cwd = idup(p->cwd);  // Inherit working directory
   safestrcpy(np->name, p->name, sizeof(p->name));
-
-  // Make thread runnable
-  np->state = RUNNABLE;
-
+  np->state = RUNNABLE;  // Make thread runnable
+  release(&np->lock);
   return np->pid;
 }
