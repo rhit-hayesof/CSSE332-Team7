@@ -728,3 +728,50 @@ uint64 thread_create(void (*start_routine)(void *), void *arg) {
   release(&np->lock);
   return np->pid;
 }
+
+int thread_join(int thread_tid, void **retval) {
+  struct proc *p = myproc();
+  struct proc *t;
+  int found = 0;
+
+  acquire(&wait_lock);
+
+  for (;;) {
+    found = 0;
+
+    // Scan the process table for the thread with matching tid
+    for (t = proc; t < &proc[NPROC]; t++) {
+      if (t->pid == thread_tid &&
+          t->is_thread &&
+          t->thread_parent == p) {
+
+        acquire(&t->lock);
+        found = 1;
+
+        if (t->state == ZOMBIE) {
+          // Optionally copy the return value
+          if (retval != 0 && t->retval != 0)
+            *retval = t->retval;
+
+          // Clean up thread resources
+          freeproc(t);
+          release(&t->lock);
+          release(&wait_lock);
+          return thread_tid;
+        }
+
+        release(&t->lock);
+      }
+    }
+
+    // No such thread was found or it's still running
+    if (!found || killed(p)) {
+      release(&wait_lock);
+      return -1;
+    }
+
+    // Sleep waiting for the target thread to become ZOMBIE
+    sleep(p, &wait_lock); // The thread will call wakeup(p) in thread_exit
+  }
+}
+

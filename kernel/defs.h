@@ -108,7 +108,7 @@ int             either_copyin(void *dst, int user_src, uint64 src, uint64 len);
 void            procdump(void);
 uint64          spoon(void*);
 uint64		thread_create(void (*start_routine)(void*), void *arg);
-uint64		thread_join(void);
+int thread_join(int thread_tid, void **retval);
 
 
 // swtch.S
@@ -138,9 +138,9 @@ int             strncmp(const char*, const char*, uint);
 char*           strncpy(char*, const char*, int);
 
 // syscall.c
-void            argint(int, int*);
+int             argint(int, int*);
 int             argstr(int, char*, int);
-void            argaddr(int, uint64 *);
+int             argaddr(int, uint64 *);
 int             fetchstr(uint64, char*, int);
 int             fetchaddr(uint64, uint64*);
 void            syscall();

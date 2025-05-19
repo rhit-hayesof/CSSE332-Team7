@@ -106,9 +106,21 @@ uint64 sys_thread_create(void) {
   return thread_create((void (*)(void *))fcn_addr, (void *)arg_addr);
 }
 
-
 uint64 sys_thread_join(void) {
-  printf("sys_thread_join: This call has not been implemented yet!\n");
-  return 0;
-}
+  int tid;
+  uint64 retval_ptr;
 
+  if (argint(0, &tid) < 0 || argaddr(1, &retval_ptr) < 0)
+    return -1;
+
+  void *retval;
+  int rc = thread_join(tid, &retval);
+  
+  // Copy retval back to user if needed
+  if (rc >= 0 && retval_ptr != 0) {
+    if (copyout(myproc()->pagetable, retval_ptr, (char *)&retval, sizeof(void *)) < 0)
+      return -1;
+  }
+
+  return rc;
+}

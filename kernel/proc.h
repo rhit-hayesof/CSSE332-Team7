@@ -109,4 +109,5 @@ struct proc {
   int is_thread;
   struct proc *thread_parent;
   void *stack_base;
+  void *retval;
 };
