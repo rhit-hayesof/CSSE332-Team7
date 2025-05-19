@@ -71,7 +71,8 @@ int argaddr(int n, uint64 *ip)
 // Fetch the nth word-sized system call argument as a null-terminated string.
 // Copies into buf, at most max.
 // Returns string length if OK (including nul), -1 if error.
-int argstr(int n, char *buf, int max)
+int
+argstr(int n, char *buf, int max)
 {
   uint64 addr;
   argaddr(n, &addr);
@@ -103,6 +104,7 @@ extern uint64 sys_close(void);
 extern uint64 sys_spoon(void);
 extern uint64 sys_thread_create(void);
 extern uint64 sys_thread_join(void);
+extern uint64 sys_thread_exit(void);
 
 // An array mapping syscall numbers from syscall.h
 // to the function that handles the system call.
@@ -131,10 +133,12 @@ static uint64 (*syscalls[])(void) = {
 [SYS_spoon]   sys_spoon,
 [SYS_thread_create] sys_thread_create,
 [SYS_thread_join] sys_thread_join,
+[SYS_thread_exit] sys_thread_exit,
 };
 
 void
-syscall(void) {
+syscall(void)
+{
   int num;
   struct proc *p = myproc();
 

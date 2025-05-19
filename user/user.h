@@ -30,6 +30,7 @@ int uptime(void);
 int spoon(void);
 int thread_create(void (*start_routine)(void*), void *arg);
 int thread_join(int tid, void **retval);
+void thread_exit(void *retval);
 // ulib.c
 int stat(const char*, struct stat*);
 char* strcpy(char*, const char*);

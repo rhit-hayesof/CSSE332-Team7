@@ -83,7 +83,6 @@ uint64
 sys_uptime(void)
 {
   uint xticks;
-
   acquire(&tickslock);
   xticks = ticks;
   release(&tickslock);
@@ -96,10 +95,10 @@ uint64 sys_spoon(void) {
   return spoon((void*)addr);
 }
 
-uint64 sys_thread_create(void) {
+uint64 
+sys_thread_create(void) {
   uint64 fcn_addr, arg_addr;
 
-  // Just call argaddr, no return check needed
   argaddr(0, &fcn_addr);
   argaddr(1, &arg_addr);
 
@@ -116,7 +115,6 @@ uint64 sys_thread_join(void) {
   void *retval;
   int rc = thread_join(tid, &retval);
   
-  // Copy retval back to user if needed
   if (rc >= 0 && retval_ptr != 0) {
     if (copyout(myproc()->pagetable, retval_ptr, (char *)&retval, sizeof(void *)) < 0)
       return -1;
@@ -124,3 +122,15 @@ uint64 sys_thread_join(void) {
 
   return rc;
 }
+
+uint64
+sys_thread_exit(void)
+{
+  uint64 retval;
+  if (argaddr(0, &retval) < 0)
+    return -1;
+
+  thread_exit((void *)retval);
+  return 0; // never reached
+}
+

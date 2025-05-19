@@ -775,3 +775,20 @@ int thread_join(int thread_tid, void **retval) {
   }
 }
 
+void thread_exit(void *retval) {
+  struct proc *p = myproc();
+
+  acquire(&wait_lock);
+  acquire(&p->lock);
+
+  p->retval = retval;
+  p->state = ZOMBIE;
+
+  wakeup(p->thread_parent);
+
+  release(&p->lock);
+  release(&wait_lock);
+
+  sched();
+  panic("zombie thread_exit");
+}

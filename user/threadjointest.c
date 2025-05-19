@@ -4,12 +4,14 @@
 void thread_func(void *arg) {
   int *shared = (int *)arg;
   *shared = 100;
-  exit(0);
+  thread_exit(0);
 }
 
 int main() {
   int shared_val = 42;
   void *retval;
+
+  printf("Creating thread...\n");
 
   int tid = thread_create(thread_func, &shared_val);
   if (tid < 0) {
