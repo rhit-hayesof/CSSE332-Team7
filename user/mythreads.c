@@ -1,5 +1,5 @@
 #include "user.h"
-#include "threads.h"
+#include "mythreads.h"
 
 int thread_create(void (*fcn)(void *), void *arg) {
   return syscall(SYS_thread_create, fcn, arg);
