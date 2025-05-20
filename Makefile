@@ -135,7 +135,8 @@ UPROGS=\
 	$U/_debug\
 	$U/_zombie\
 	$U/_threadtest\
-	$/_threadjointest\
+	$U/_threadjointest\
+	$U/_threadmemtest\
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)

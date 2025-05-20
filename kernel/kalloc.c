@@ -1,4 +1,4 @@
-=// Physical memory allocator, for user processes,
+// Physical memory allocator, for user processes,
 // kernel stacks, page-table pages,
 // and pipe buffers. Allocates whole 4096-byte pages.
 
@@ -54,7 +54,6 @@ kfree(void *pa)
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
 
-  memset(pa, 1, PGSIZE); // Fill with junk
   decref((uint64)pa);
 }
 
@@ -73,7 +72,6 @@ kalloc(void)
   release(&kmem.lock);
 
   if(r) {
-    printf("kalloc: got page %p\n", r);
     memset((char*)r, 5, PGSIZE); // fill with junk
     refcount[PA2INDEX((uint64)r)] = 1;
   }
@@ -89,7 +87,9 @@ void incref(uint64 pa) {
   if(idx < 0 || idx >= (PHYSTOP - (uint64)end) >> PGSHIFT)
     panic("incref: idx out of bounds");
 
-  __sync_fetch_and_add(&refcount[idx], 1);
+  acquire(&kmem.lock);
+  refcount[idx] += 1;
+  release(&kmem.lock);
 }
 
 void decref(uint64 pa) {
@@ -100,7 +100,14 @@ void decref(uint64 pa) {
   if(idx < 0 || idx >= (PHYSTOP - (uint64)end) >> PGSHIFT)
     panic("decref: idx out of bounds");
 
-  if (__sync_sub_and_fetch(&refcount[idx], 1) == 0) {
+  acquire(&kmem.lock);
+  refcount[idx] -= 1;
+  int freed = refcount[idx] <= 0;
+  release(&kmem.lock);
+
+  if (freed) {
+    memset((void*)pa, 1, PGSIZE); // Fill with junk
+
     struct run *r = (struct run*)pa;
     acquire(&kmem.lock);
     r->next = kmem.freelist;

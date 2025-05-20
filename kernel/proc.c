@@ -252,7 +252,6 @@ userinit(void)
   p->state = RUNNABLE;
 
   release(&p->lock);
-  printf("userinit done\n");
 }
 
 // Grow or shrink user memory by n bytes.
