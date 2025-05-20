@@ -1,0 +1,41 @@
+---
+title: Project Milestone 3  
+Author(s): Orin Hayes
+Date: 5/20/2025
+---
+
+High level description
+======================
+
+This milestone extends xv6 to support pthread-like user-level threads. It implements the ability to create threads using thread_create, synchronize them using thread_join, and terminate them with thread_exit. All threads share the same address space as their parent process, including code, heap, and global data, but use separate kernel stacks and user stacks.
+
+Thread creation
+===============
+
+Threads are created using thread_create, which allocates a new struct proc, sets its is_thread flag, and marks the current process as the parent via thread_parent. Rather than duplicating memory via uvmcopy, the thread inherits the parent’s pagetable using a custom uvmshare function that maps the same physical pages into the child thread’s page table and increments reference counts.
+
+Each thread receives a new kernel stack and a separate user stack region, allocated near the top of user memory (MAXVA - 2 * PGSIZE * tid). The user-level function and its argument are set via the trapframe. File descriptors and working directories are inherited from the parent.
+
+Memory sharing
+==============
+
+To support memory sharing across threads, the uvmshare function maps the same physical pages into both the parent and child pagetables using mappages, and calls incref to track shared ownership. When a thread exits, decref is used to safely free memory only when all threads have finished using a page.
+
+Reference counting is implemented in kalloc.c using a static array indexed by physical page number.
+
+Test cases
+==========
+
+- **Thread creation test:** The `threadtest` program creates a thread that prints a message and exits. The parent joins the thread and prints a confirmation, verifying that thread creation, execution, and join all work as expected.
+
+- **Shared memory test:** The `threadmemtest` program creates a global counter in the parent process. Multiple threads increment the counter in parallel. The final result is checked in the parent to confirm that shared memory access is working and properly synchronized.
+
+Additional comments
+===================
+
+We did write complete tests but have no way to run them because the terminal does not actually start after implementing uvmshare.
+
+Grade
+=====
+
+We believe this milestone deserves a grade of C. It is safe to assume that the thread_join isn't working properly since we can't even run the tests to varify it. I wasn't able to figure out why the terminal wouldn't start and so I can't run any of the tests, all I a have to show is the code in proc.c really, and the test code.

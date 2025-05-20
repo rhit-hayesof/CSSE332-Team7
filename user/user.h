@@ -29,7 +29,7 @@ int sleep(int);
 int uptime(void);
 int spoon(void);
 int thread_create(void (*start_routine)(void*), void *arg);
-int thread_join(int tid, void **retval);
+int thread_join(int thread_tid, void **retval);
 void thread_exit(void *retval);
 // ulib.c
 int stat(const char*, struct stat*);

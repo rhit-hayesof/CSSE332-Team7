@@ -437,3 +437,19 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
     return -1;
   }
 }
+
+int uvmshare(pagetable_t src, pagetable_t dst, uint64 sz) {
+  for (uint64 va = 0; va < sz; va += PGSIZE) {
+    pte_t *pte = walk(src, va, 0);
+    if (!pte || (*pte & PTE_V) == 0)
+      continue;
+
+    uint64 pa = PTE2PA(*pte);
+    incref(pa);
+    if (mappages(dst, va, PGSIZE, pa, PTE_FLAGS(*pte)) < 0) {
+      // handle error and rollback
+      return -1;
+    }
+  }
+  return 0;
+}

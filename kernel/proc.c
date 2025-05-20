@@ -252,6 +252,7 @@ userinit(void)
   p->state = RUNNABLE;
 
   release(&p->lock);
+  printf("userinit done\n");
 }
 
 // Grow or shrink user memory by n bytes.
@@ -697,7 +698,7 @@ uint64 thread_create(void (*start_routine)(void *), void *arg) {
   p = myproc();
   pop_off(); 
   // Copy user memory from parent to child (new address space)
-  if (uvmcopy(p->pagetable, np->pagetable, p->sz) < 0) {
+  if (uvmshare(p->pagetable, np->pagetable, p->sz) < 0) {
     freeproc(np);
     return -1;
   }
@@ -771,7 +772,7 @@ int thread_join(int thread_tid, void **retval) {
     }
 
     // Sleep waiting for the target thread to become ZOMBIE
-    sleep(p, &wait_lock); // The thread will call wakeup(p) in thread_exit
+    sleep(t, &wait_lock); // The thread will call wakeup(p) in thread_exit
   }
 }
 
@@ -786,9 +787,9 @@ void thread_exit(void *retval) {
 
   wakeup(p->thread_parent);
 
-  release(&p->lock);
   release(&wait_lock);
 
   sched();
+  release(&p->lock);
   panic("zombie thread_exit");
 }
