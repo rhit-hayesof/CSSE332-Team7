@@ -104,10 +104,10 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
-
   //thread support
   int is_thread;
   struct proc *thread_parent;
   void *stack_base;
   void *retval;
+  int thread_refcount;
 };
