@@ -137,6 +137,7 @@ UPROGS=\
 	$U/_threadtest\
 	$U/_threadjointest\
 	$U/_threadmemtest\
+	$U/_threadstress\
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)

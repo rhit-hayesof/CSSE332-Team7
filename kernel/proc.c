@@ -714,18 +714,14 @@ uint64 thread_create(void (*start_routine)(void *), void *arg) {
   uint64 stack_bottom = MAXVA - (np->pid + 1) * 2 * PGSIZE;  // shift each thread's stack
   uint64 stack_top = stack_bottom + PGSIZE;
 
-   printf("[thread_create] Allocating stack from 0x%p to 0x%p\n", stack_bottom, stack_top);
 
   if (uvmalloc(np->pagetable, stack_bottom, stack_top, PTE_W | PTE_U) == 0) {
-    printf("[thread_create] Failed to allocate stack\n");
     freeproc(np);
     return -1;
   }
   np->stack_base = (void*)stack_bottom;// Save for cleanup
   np->trapframe->sp = stack_top; // Set stack pointer
   np->trapframe->a0 = (uint64)arg; // Pass the argument
-  printf("[thread_create] trapframe sp=0x%p epc=0x%p\n", np->trapframe->sp, np->trapframe->epc);
-  printf("[thread_create] trapframe address: 0x%p\n", np->trapframe);
   // Thread metadata
   np->is_thread = 1;
   np->thread_parent = p;
@@ -745,7 +741,6 @@ uint64 thread_create(void (*start_routine)(void *), void *arg) {
   np->state = RUNNABLE;  // Make thread runnable
   release(&np->lock);
 
-  printf("[thread_create] Thread %d successfully created\n", np->pid);
   return np->pid;
 }
 
@@ -754,7 +749,6 @@ int thread_join(int thread_tid, void **retval) {
   struct proc *t;
   int found = 0;
 
-  printf("[thread_join] Attempting to join thread %d\n", thread_tid);
 
   acquire(&wait_lock);
 
@@ -771,7 +765,6 @@ int thread_join(int thread_tid, void **retval) {
         found = 1;
 
         if (t->state == ZOMBIE) {
-          printf("[thread_join] Found ZOMBIE thread %d\n", t->pid);
           // Optionally copy the return value
           if (retval != 0 && t->retval != 0)
             *retval = t->retval;
@@ -789,11 +782,9 @@ int thread_join(int thread_tid, void **retval) {
 
     // No such thread was found or it's still running
     if (!found || killed(p)) {
-      printf("[thread_join] Failed to find thread %d or process was killed\n", thread_tid);
       release(&wait_lock);
       return -1;
     }
-    printf("[thread_join] Sleeping, waiting for thread %d to finish\n", thread_tid);
     // Sleep waiting for the target thread to become ZOMBIE
     sleep(p, &wait_lock); // The thread will call wakeup(p) in thread_exit
   }
@@ -803,7 +794,6 @@ void thread_exit(void *retval) {
   struct proc *p = myproc();
   struct proc *parent = p->thread_parent;
 
-  printf("[thread_exit] Thread %d exiting with retval %p\n", p->pid, retval);
 
   acquire(&wait_lock);
   acquire(&p->lock);
@@ -817,7 +807,6 @@ void thread_exit(void *retval) {
   int remaining = parent->thread_refcount;
   release(&parent->lock);
 
-  printf("[thread_exit] Remaining thread_refcount = %d\n", remaining);
 
   wakeup(p->thread_parent);
 
