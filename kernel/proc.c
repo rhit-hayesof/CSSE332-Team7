@@ -804,7 +804,7 @@ void thread_exit(void *retval) {
   // decrement thread refcount on parent
   acquire(&parent->lock);
   parent->thread_refcount--;
-  int remaining = parent->thread_refcount;
+  // int remaining = parent->thread_refcount;
   release(&parent->lock);
 
 
