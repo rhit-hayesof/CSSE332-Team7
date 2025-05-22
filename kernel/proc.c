@@ -263,18 +263,38 @@ userinit(void)
 int
 growproc(int n)
 {
-  uint64 sz;
+  uint64 oldsz, new_sz;
   struct proc *p = myproc();
 
-  sz = p->sz;
-  if(n > 0){
-    if((sz = uvmalloc(p->pagetable, sz, sz + n, PTE_W)) == 0) {
+  oldsz = p->sz;
+  new_sz = oldsz;
+
+  if(n > 0) {
+    new_sz = uvmalloc(p->pagetable, oldsz, oldsz + n, PTE_W | PTE_U);
+    if(new_sz == 0) {
       return -1;
     }
   } else if(n < 0){
-    sz = uvmdealloc(p->pagetable, sz, sz + n);
+    new_sz = uvmdealloc(p->pagetable, oldsz, oldsz + n);
   }
-  p->sz = sz;
+  // Now propagate the change to sibling threads
+  for (struct proc *t = proc; t < &proc[NPROC]; t++) {
+  if (t == p)
+    continue;  
+  if (!t->is_thread || t->address_space_owner != p->address_space_owner) 
+    continue;
+  if(n > 0) {
+    if(uvmalloc(t->pagetable, oldsz, new_sz, PTE_W | PTE_U) == 0) {
+      panic("growproc: uvmalloc failed on sibling");
+    }
+  } else if (n < 0) {
+    uvmdealloc(t->pagetable, oldsz, new_sz);
+  }
+
+  //Update thread's size to match the owner's
+  t->sz = new_sz;
+}
+  p->sz = new_sz;
   return 0;
 }
 
@@ -714,7 +734,6 @@ uint64 thread_create(void (*start_routine)(void *), void *arg) {
   uint64 stack_bottom = MAXVA - (np->pid + 1) * 2 * PGSIZE;  // shift each thread's stack
   uint64 stack_top = stack_bottom + PGSIZE;
 
-
   if (uvmalloc(np->pagetable, stack_bottom, stack_top, PTE_W | PTE_U) == 0) {
     freeproc(np);
     return -1;
@@ -725,6 +744,8 @@ uint64 thread_create(void (*start_routine)(void *), void *arg) {
   // Thread metadata
   np->is_thread = 1;
   np->thread_parent = p;
+  // If the parent already has an owner, inherit it; otherwise, parent is the owner
+  np->address_space_owner = p->address_space_owner ? p->address_space_owner : p;
 
   // increment thread count on parent
   acquire(&p->lock);
@@ -794,7 +815,6 @@ void thread_exit(void *retval) {
   struct proc *p = myproc();
   struct proc *parent = p->thread_parent;
 
-
   acquire(&wait_lock);
   acquire(&p->lock);
 
@@ -804,9 +824,7 @@ void thread_exit(void *retval) {
   // decrement thread refcount on parent
   acquire(&parent->lock);
   parent->thread_refcount--;
-  // int remaining = parent->thread_refcount;
   release(&parent->lock);
-
 
   wakeup(p->thread_parent);
 

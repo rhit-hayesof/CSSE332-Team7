@@ -110,4 +110,5 @@ struct proc {
   void *stack_base;
   void *retval;
   int thread_refcount;
+  struct proc *address_space_owner; // points to parent process who owns memory
 };
