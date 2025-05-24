@@ -6,31 +6,41 @@ volatile int ready = 0;         // thread2 waits until this is set
 volatile int memory_freed = 0;  // thread2 checks this before accessing p
 
 void thread1(void *arg) {
-  p = (int*)sbrk(4096); // allocate 1 page
+  // Allocate 1 page and initialize data
+  p = (int*)sbrk(4096);
   p[0] = 3;
   p[1] = 2;
 
-  __sync_synchronize(); // memory barrier
+  // Signal that memory and data are ready
+  __sync_synchronize();
   ready = 1;
 
-  sleep(20); // give thread2 time to read
+  // Sleep to allow thread2 time to safely read
+  sleep(10);
 
-  sbrk(-4096); // deallocate
-
+  // Signal that memory is about to be freed
   memory_freed = 1;
+  __sync_synchronize();
+
+  // Now safely deallocate
+  sbrk(-4096);
+
   thread_exit(0);
 }
 
 void thread2(void *arg) {
-  while (!ready) sleep(1); // wait until data is ready
+  // Wait until data is ready
+  while (!ready) sleep(1);
 
-  __sync_synchronize(); // memory barrier
+  __sync_synchronize();
 
   printf("Thread2: reading values...\n");
-  if (!memory_freed && p && p[0] == 3 && p[1] == 2) {
-    printf("Success: shared mapping propagated\n");
-  } else if (memory_freed) {
+
+  // Only access memory if it has not been freed
+  if (memory_freed) {
     printf("Skipped access: memory has been unmapped\n");
+  } else if (p && p[0] == 3 && p[1] == 2) {
+    printf("Success: shared mapping propagated\n");
   } else {
     printf("Failure: unexpected data\n");
   }
