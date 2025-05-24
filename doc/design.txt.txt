@@ -1,0 +1,77 @@
+---
+title: Project Milestone 4
+Author(s): Orin Hayes, Eric Riddle,  Garrin Donovan
+Date: 5/23/2025
+---
+
+High level description
+======================
+
+In this project, we extended the xv6 operating system to support user-level threads with shared address spaces and coordinated memory management. Our implementation includes:
+
+- (M2) User-level thread creation using a new system call that spawns threads from within the same address space.
+- (M3) Shared memory between threads by ensuring all threads map to the same page table.
+- (M4) Propagation of memory updates (e.g., sbrk changes) from one thread to all others sharing the same address space.
+
+We also designed test cases to validate correct synchronization, memory sharing, and page table update propagation among threads.
+
+(M2) Thread creation
+====================
+
+For thread creation, we added a `thread_create` system call. This function initializes a new thread using the same address space (`pagetable`) as the calling process, allocates a unique stack using `kalloc`, and sets up the stack to pass a function pointer and argument to the new thread.
+
+We store threads in the `proc` table with a new `is_thread` flag to differentiate them from processes. Each thread is linked to a parent process (`main_thread`) that owns the address space and is responsible for resource cleanup.
+
+Decisions:
+- Threads share file descriptors, current working directory, and the address space.
+- The thread stack is allocated explicitly and deallocated on exit.
+- We use a wrapper trampoline to transition to the provided function safely.
+
+(M3) Memory sharing
+===================
+
+We implemented memory sharing by having all threads point to the same `pagetable` as the main thread. During thread creation, the newly created thread’s `pagetable` field is set to that of the parent process.
+
+Additionally, we ensured the `sbrk()` system call would expand the heap only once for the shared address space. The new memory is immediately visible to all threads since they access the same virtual memory layout.
+
+Decisions:
+- Only the main thread manages the heap size via `sbrk`.
+- Threads read/write to the heap and stack regions directly.
+- Shared memory regions are kept consistent by design due to a shared `pagetable`.
+
+(M4) Memory updates
+===================
+
+For memory updates (e.g., via `sbrk`), we had to ensure that new memory mappings are visible across all threads. Since all threads share a `pagetable`, any changes to the page table are inherently visible to all of them.
+
+However, to support thread termination and stack cleanup, we maintained a per-thread stack mapping. On `thread_exit`, we unmap the thread’s stack and free the pages using `uvmunmap`.
+
+To track which threads are in the same address space, we added a `main_thread` pointer in each thread. This allows us to traverse the `proc` table to find all threads belonging to a given address space for future enhancements (e.g., advanced cleanup or fault handling).
+
+Test cases
+===========
+
+- (M2) Thread Creation Test:
+  - A test function that spawns a thread that prints a message and exits.
+  - Ensures that thread stacks are correctly allocated and execution continues independently.
+
+- (M3) Shared Memory Test:
+  - One thread allocates memory with `sbrk`, writes values, and sets a flag.
+  - Another thread waits on the flag and reads the values to confirm memory visibility.
+  - Confirms that all threads see the same heap.
+
+- (M4) Page Table Update Propagation:
+  - A thread uses `sbrk` to allocate memory and another thread accesses it.
+  - Then the first thread frees the memory using `sbrk(-)` and sets a flag.
+  - The second thread checks the flag and skips the read, ensuring no segmentation fault occurs.
+  - Validates synchronization and safe unmapping behavior.
+
+Additional comments
+==================
+
+- We found that using `sleep()` for inter-thread synchronization is unreliable, so we implemented memory barriers (`__sync_synchronize`) and condition-style flags..
+
+Grade
+======
+
+We believe our group deserves an B. We met all the milestone requirements and ensured correctness through careful memory management, rigorous test cases, and clean design. The only thing is that our M4 test is inconsistent, but this is due to thead1 deallocating before thread2 has a chance to read from it.
