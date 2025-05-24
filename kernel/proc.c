@@ -260,9 +260,7 @@ userinit(void)
 
 // Grow or shrink user memory by n bytes.
 // Return 0 on success, -1 on failure.
-int
-growproc(int n)
-{
+int growproc(int n) {
   uint64 oldsz, new_sz;
   struct proc *p = myproc();
 
@@ -271,10 +269,9 @@ growproc(int n)
 
   if(n > 0) {
     new_sz = uvmalloc(p->pagetable, oldsz, oldsz + n, PTE_W | PTE_U);
-    if(new_sz == 0) {
+    if(new_sz == 0) 
       return -1;
-    }
-  } else if(n < 0){
+  } else if(n < 0) {
     new_sz = uvmdealloc(p->pagetable, oldsz, oldsz + n);
   }
   // Now propagate the change to sibling threads
@@ -283,17 +280,27 @@ growproc(int n)
     continue;  
   if (!t->is_thread || t->address_space_owner != p->address_space_owner) 
     continue;
+
   if(n > 0) {
-    if(uvmalloc(t->pagetable, oldsz, new_sz, PTE_W | PTE_U) == 0) {
+    if(uvmshare_range(p->pagetable, t->pagetable, oldsz, new_sz) < 0) {
       panic("growproc: uvmalloc failed on sibling");
     }
   } else if (n < 0) {
-    uvmdealloc(t->pagetable, oldsz, new_sz);
+    for (uint64 a = new_sz; a < oldsz; a += PGSIZE) {
+        pte_t *pte = walk(t->pagetable, a, 0);
+        if (pte == 0) {
+          continue;
+        } else if (!(*pte & PTE_V)) {
+          continue;
+        }
+        uvmunmap(t->pagetable, a, 1, 1);
+      }
   }
 
   //Update thread's size to match the owner's
   t->sz = new_sz;
 }
+
   p->sz = new_sz;
   return 0;
 }
@@ -830,9 +837,10 @@ void thread_exit(void *retval) {
 
   release(&wait_lock);
 
-  if (!holding(&p->lock))
+  if (!holding(&p->lock)) {
     panic("sched without p->lock");
-
+  }
+  
   sched();
   panic("zombie thread_exit");
 }

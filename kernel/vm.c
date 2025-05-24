@@ -440,16 +440,44 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 
 int uvmshare(pagetable_t src, pagetable_t dst, uint64 sz) {
   for (uint64 va = 0; va < sz; va += PGSIZE) {
-    pte_t *pte = walk(src, va, 0);
-    if (!pte || (*pte & PTE_V) == 0)
+    if(va >= MAXVA || va == TRAPFRAME || va == TRAMPOLINE)
       continue;
-
+    pte_t *pte = walk(src, va, 0);
+    if(!pte || (*pte & PTE_V) == 0)
+      continue;
+    
     uint64 pa = PTE2PA(*pte);
     incref(pa);
+
     if (mappages(dst, va, PGSIZE, pa, PTE_FLAGS(*pte)) < 0) {
-      // handle error and rollback
+      // rollback previously mapped pages
+      for (uint64 va2 = 0; va2 < va; va2 += PGSIZE) {
+        if(va2 == TRAMPOLINE || va2 == TRAPFRAME) 
+          continue;
+        pte_t *pte2 = walk(dst, va2, 0);
+        if (pte2 && (*pte2 & PTE_V)) {
+          uint64 pa2 = PTE2PA(*pte2);
+          uvmunmap(dst, va2, 1, 0);
+          decref(pa2);
+        }
+      }
       return -1;
     }
+  }
+  return 0;
+}
+
+int uvmshare_range(pagetable_t src, pagetable_t dst, uint64 oldsz, uint64 newsz) {
+  for (uint64 va = PGROUNDUP(oldsz); va < newsz; va += PGSIZE) {
+    pte_t *pte = walk(src, va, 0);
+    if (!pte || (*pte & PTE_V) == 0)
+      return -1;
+
+    uint64 pa = PTE2PA(*pte);
+    incref(pa); // or track refcount manually
+
+    if (mappages(dst, va, PGSIZE, pa, PTE_FLAGS(*pte)) < 0)
+      return -1;
   }
   return 0;
 }
